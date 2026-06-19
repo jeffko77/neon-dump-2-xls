@@ -61,20 +61,14 @@ begin
   for I := 1 to Length(Value) do
   begin
     Ch := Value[I];
-    case Ch of
-      '\': Result := Result + '\\';
-      '"': Result := Result + '\"';
-      Chr(8): Result := Result + '\b';
-      Chr(9): Result := Result + '\t';
-      Chr(10): Result := Result + '\n';
-      Chr(13): Result := Result + '\r';
-      Chr(12): Result := Result + '\f';
+    if Ch = '\' then
+      Result := Result + '\\'
+    else if Ch = '"' then
+      Result := Result + '\"'
+    else if Ord(Ch) < 32 then
+      Result := Result + ' '
     else
-      if Ord(Ch) < 32 then
-        Result := Result + '\u' + IntToHex(Ord(Ch), 4)
-      else
-        Result := Result + Ch;
-    end;
+      Result := Result + Ch;
   end;
 end;
 
