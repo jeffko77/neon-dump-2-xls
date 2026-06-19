@@ -22,6 +22,7 @@ from app.connection import (
     load_database_url,
 )
 from app.export.database_excel_export import DEFAULT_SCHEMAS, export_database_to_excel
+from app.reveal import reveal_path, validate_reveal_path
 
 
 def static_dir() -> Path:
@@ -49,6 +50,7 @@ class ExportState:
     current_index: int = 0
     total_tables: int = 0
     output_path: str | None = None
+    diagram_path: str | None = None
     error: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
@@ -59,6 +61,10 @@ export_lock = threading.Lock()
 
 app = FastAPI(title="Neon Database Excel Export")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+class RevealRequest(BaseModel):
+    path: str
 
 
 class ExportRequest(BaseModel):
@@ -118,6 +124,7 @@ def _run_export(output_path: Path, schemas: tuple[str, ...]) -> None:
         with export_lock:
             export_state.status = "completed"
             export_state.output_path = summary.output_path
+            export_state.diagram_path = summary.diagram_path
             export_state.finished_at = datetime.now(UTC).isoformat()
     except Exception as exc:  # noqa: BLE001
         with export_lock:
@@ -161,6 +168,22 @@ def start_export(request: ExportRequest) -> dict:
     thread.start()
     return {"status": "running", "output_path": str(output_path)}
 
+
+
+
+@app.post("/api/reveal")
+def reveal_file(request: RevealRequest) -> dict:
+    try:
+        resolved = validate_reveal_path(
+            request.path,
+            exports_dir=EXPORTS_DIR,
+            app_directory=app_dir(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    reveal_path(resolved)
+    return {"status": "ok", "path": str(resolved)}
 
 @app.get("/api/export/latest")
 def latest_export() -> dict:

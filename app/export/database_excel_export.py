@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -34,11 +35,19 @@ from psycopg2 import sql
 from psycopg2.extensions import connection as PgConnection
 
 from app.connection import connection_host
+from app.export.logical_keys import (
+    build_mermaid_er,
+    build_mermaid_er_sections,
+    explicit_logical_edges,
+    load_logical_keys_config,
+    logical_key_rows,
+)
+from app.export.schema_diagram import write_schema_diagram_html
 
 DEFAULT_SCHEMAS = ("public", "archive")
 BATCH_SIZE = 1000
 ILLEGAL_EXCEL_CHARS = re.compile(r"[\000-\010\013\014\016-\037]")
-DOC_SHEETS = ("_README", "_Tables", "_Columns", "_ForeignKeys", "_ER_Diagram")
+DOC_SHEETS = ("_README", "_Tables", "_Columns", "_ForeignKeys", "_LogicalKeys", "_ER_Diagram")
 ProgressCallback = Callable[[str, int, int], None]
 
 
@@ -52,6 +61,7 @@ class TableRef:
 @dataclass(frozen=True)
 class ExportSummary:
     output_path: str
+    diagram_path: str
     table_count: int
     sheet_count: int
     exported_at: datetime
@@ -128,41 +138,34 @@ def fetch_foreign_keys(conn: PgConnection, schemas: tuple[str, ...]) -> list[lis
         cur.execute(
             """
             SELECT
-                tc.table_schema,
-                tc.table_name,
-                kcu.column_name,
-                ccu.table_schema AS foreign_table_schema,
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name,
-                tc.constraint_name
-            FROM information_schema.table_constraints tc
-            JOIN information_schema.key_column_usage kcu
-              ON tc.constraint_name = kcu.constraint_name
-             AND tc.table_schema = kcu.table_schema
-            JOIN information_schema.constraint_column_usage ccu
-              ON ccu.constraint_name = tc.constraint_name
-             AND ccu.table_schema = tc.table_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND tc.table_schema = ANY(%s)
-            ORDER BY tc.table_schema, tc.table_name, kcu.ordinal_position
+                ns_src.nspname AS table_schema,
+                src.relname AS table_name,
+                att_src.attname AS column_name,
+                ns_tgt.nspname AS foreign_table_schema,
+                tgt.relname AS foreign_table_name,
+                att_tgt.attname AS foreign_column_name,
+                con.conname AS constraint_name
+            FROM pg_constraint con
+            JOIN pg_class src ON src.oid = con.conrelid
+            JOIN pg_namespace ns_src ON ns_src.oid = src.relnamespace
+            JOIN pg_class tgt ON tgt.oid = con.confrelid
+            JOIN pg_namespace ns_tgt ON ns_tgt.oid = tgt.relnamespace
+            JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS src_cols(attnum, ord) ON TRUE
+            JOIN LATERAL unnest(con.confkey) WITH ORDINALITY AS tgt_cols(attnum, ord)
+              ON tgt_cols.ord = src_cols.ord
+            JOIN pg_attribute att_src
+              ON att_src.attrelid = src.oid AND att_src.attnum = src_cols.attnum
+            JOIN pg_attribute att_tgt
+              ON att_tgt.attrelid = tgt.oid AND att_tgt.attnum = tgt_cols.attnum
+            WHERE con.contype = 'f'
+              AND ns_src.nspname = ANY(%s)
+            ORDER BY ns_src.nspname, src.relname, src_cols.ord
             """,
             (list(schemas),),
         )
         return [list(row) for row in cur.fetchall()]
 
 
-def build_mermaid_er(foreign_keys: list[list[Any]]) -> str:
-    lines = ["erDiagram"]
-    seen_edges: set[str] = set()
-    for row in foreign_keys:
-        source_schema, source_table, _, target_schema, target_table, _, _ = row
-        source = f"{source_schema}_{source_table}".replace(" ", "_")
-        target = f"{target_schema}_{target_table}".replace(" ", "_")
-        edge = f"    {source} }}o--|| {target} : references"
-        if edge not in seen_edges:
-            lines.append(edge)
-            seen_edges.add(edge)
-    return "\n".join(lines)
 
 
 def sanitize_sheet_name(schema_name: str, table_name: str) -> str:
@@ -278,7 +281,11 @@ def export_database_to_excel(
         inventory = fetch_table_inventory(conn, schemas)
         columns = fetch_columns(conn, schemas)
         foreign_keys = fetch_foreign_keys(conn, schemas)
-        mermaid = build_mermaid_er(foreign_keys)
+        logical_config = load_logical_keys_config()
+        logical_edges = explicit_logical_edges(logical_config)
+        logical_rows = logical_key_rows(logical_config)
+        mermaid = build_mermaid_er(foreign_keys, logical_edges)
+        mermaid_sections = build_mermaid_er_sections(foreign_keys, logical_edges)
 
         workbook = Workbook(write_only=True)
         write_readme_sheet(
@@ -328,6 +335,21 @@ def export_database_to_excel(
         )
         write_doc_sheet(
             workbook,
+            "_LogicalKeys",
+            [
+                "source_schema",
+                "source_table",
+                "source_column",
+                "target_schema",
+                "target_table",
+                "target_column",
+                "link_type",
+                "note",
+            ],
+            logical_rows,
+        )
+        write_doc_sheet(
+            workbook,
             "_ER_Diagram",
             ["mermaid_source"],
             [[mermaid]],
@@ -342,8 +364,22 @@ def export_database_to_excel(
 
         workbook.save(output_path)
 
+    diagram_path = Path(output_path).with_name(
+        Path(output_path).stem + "_schema_diagram.html"
+    )
+    write_schema_diagram_html(
+        diagram_path,
+        mermaid_source=mermaid,
+        mermaid_sections=mermaid_sections,
+        host=host if isinstance(host, str) else "unknown-host",
+        exported_at=exported_at,
+        fk_count=len(foreign_keys),
+        logical_count=len(logical_edges),
+    )
+
     return ExportSummary(
         output_path=output_path,
+        diagram_path=str(diagram_path),
         table_count=len(tables),
         sheet_count=len(used_names),
         exported_at=exported_at,

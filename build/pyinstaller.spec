@@ -8,6 +8,7 @@ block_cipher = None
 datas = [
     (str(root / "static"), "static"),
     (str(root / "config.example.json"), "."),
+    (str(root / "data"), "data"),
 ]
 
 hiddenimports = [

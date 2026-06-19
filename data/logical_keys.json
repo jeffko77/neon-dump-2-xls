@@ -1,0 +1,102 @@
+{
+  "description": "Logical relationships for lax-scheduler (Neon). Postgres FK constraints are exported separately; these are legacy/app-level links without database enforcement.",
+  "dimensions": [
+    {"schema": "public", "table": "tblschool", "column": "schoolid", "label": "School"},
+    {"schema": "public", "table": "tblseason", "column": "seasonid", "label": "Season"},
+    {"schema": "public", "table": "tblsport", "column": "sportid", "label": "Sport"},
+    {"schema": "public", "table": "tblgender", "column": "genderid", "label": "Gender"},
+    {"schema": "public", "table": "tbllevel", "column": "levelid", "label": "Level"},
+    {"schema": "public", "table": "tblconference", "column": "conferenceid", "label": "Conference"},
+    {"schema": "public", "table": "tblscheduleworkspace", "column": "workspace_id", "label": "Schedule workspace"},
+    {"schema": "public", "table": "tblscheduleversion", "column": "version_id", "label": "Schedule version"}
+  ],
+  "column_patterns": [
+    {
+      "column": "schoolid",
+      "target_schema": "public",
+      "target_table": "tblschool",
+      "target_column": "schoolid",
+      "note": "School reference on roster, stats, conflicts, rankings, etc."
+    },
+    {
+      "column": "seasonid",
+      "target_schema": "public",
+      "target_table": "tblseason",
+      "target_column": "seasonid",
+      "note": "Season scope on schedule, roster, rankings, and config tables"
+    },
+    {
+      "column": "sportid",
+      "target_schema": "public",
+      "target_table": "tblsport",
+      "target_column": "sportid",
+      "note": "Sport scope (lacrosse, field hockey, etc.)"
+    },
+    {
+      "column": "genderid",
+      "target_schema": "public",
+      "target_table": "tblgender",
+      "target_column": "genderid",
+      "note": "Boys/girls/coed partition"
+    },
+    {
+      "column": "conferenceid",
+      "target_schema": "public",
+      "target_table": "tblconference",
+      "target_column": "conferenceid",
+      "note": "Conference assignment"
+    },
+    {
+      "column": "levelid",
+      "target_schema": "public",
+      "target_table": "tbllevel",
+      "target_column": "levelid",
+      "note": "Varsity/JV/Frosh level"
+    },
+    {
+      "column": "workspace_id",
+      "target_schema": "public",
+      "target_table": "tblscheduleworkspace",
+      "target_column": "workspace_id",
+      "note": "Schedule build workspace"
+    },
+    {
+      "column": "version_id",
+      "target_schema": "public",
+      "target_table": "tblscheduleversion",
+      "target_column": "version_id",
+      "note": "Published schedule version"
+    }
+  ],
+  "relationships": [
+    {"source_schema": "public", "source_table": "tblschedule", "source_column": "schoolidteam1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Home team school"},
+    {"source_schema": "public", "source_table": "tblschedule", "source_column": "schoolidteam2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Away team school"},
+    {"source_schema": "public", "source_table": "tblschedule", "source_column": "team1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Home team code (often matches schoolid)"},
+    {"source_schema": "public", "source_table": "tblschedule", "source_column": "team2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Away team code (often matches schoolid)"},
+    {"source_schema": "public", "source_table": "tblscheduleversiongames", "source_column": "schoolidteam1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Version game home school"},
+    {"source_schema": "public", "source_table": "tblscheduleversiongames", "source_column": "schoolidteam2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Version game away school"},
+    {"source_schema": "public", "source_table": "tblscheduleversiongames", "source_column": "version_id", "target_schema": "public", "target_table": "tblscheduleversion", "target_column": "version_id", "note": "Parent schedule version"},
+    {"source_schema": "public", "source_table": "tblschedulebuild", "source_column": "schoolidteam1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Build workspace home school"},
+    {"source_schema": "public", "source_table": "tblschedulebuild", "source_column": "schoolidteam2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Build workspace away school"},
+    {"source_schema": "public", "source_table": "tblscheduledate", "source_column": "schoolidteam1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Date row home school"},
+    {"source_schema": "public", "source_table": "tblscheduledate", "source_column": "schoolidteam2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Date row away school"},
+    {"source_schema": "public", "source_table": "tblscheduleconference", "source_column": "team1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Conference matchup team 1"},
+    {"source_schema": "public", "source_table": "tblscheduleconference", "source_column": "team2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Conference matchup team 2"},
+    {"source_schema": "public", "source_table": "tblscheduletemplate", "source_column": "team1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Template team 1"},
+    {"source_schema": "public", "source_table": "tblscheduletemplate", "source_column": "team2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Template team 2"},
+    {"source_schema": "public", "source_table": "tblgamelist", "source_column": "team1", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Game list home team"},
+    {"source_schema": "public", "source_table": "tblgamelist", "source_column": "team2", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Game list away team"},
+    {"source_schema": "public", "source_table": "tblschoolalias", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Alias to canonical school"},
+    {"source_schema": "public", "source_table": "tblschoolsportconference", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "School conference membership"},
+    {"source_schema": "public", "source_table": "tblschoolsportconferenceintradistrict", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Intra-district school grouping"},
+    {"source_schema": "public", "source_table": "tblroster", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Player school"},
+    {"source_schema": "public", "source_table": "tblplayerstats", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Stats school"},
+    {"source_schema": "public", "source_table": "tblteamrank", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Ranking school"},
+    {"source_schema": "public", "source_table": "tblfieldconflict", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Field conflict school"},
+    {"source_schema": "public", "source_table": "tblschoolconflict", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "School date conflict"},
+    {"source_schema": "public", "source_table": "arbiter_schools", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Arbiter school to internal school"},
+    {"source_schema": "public", "source_table": "tblassetreservation", "source_column": "schoolid", "target_schema": "public", "target_table": "tblschool", "target_column": "schoolid", "note": "Asset reservation school"},
+    {"source_schema": "public", "source_table": "tblassetreservation", "source_column": "assetid", "target_schema": "public", "target_table": "tblasset", "target_column": "assetid", "note": "Reserved asset"},
+    {"source_schema": "public", "source_table": "conflict_form_fields", "source_column": "form_id", "target_schema": "public", "target_table": "conflict_form_definitions", "target_column": "id", "note": "Also enforced by FK"}
+  ]
+}

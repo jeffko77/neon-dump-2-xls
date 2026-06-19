@@ -34,6 +34,8 @@
     .ok { color: #0a7a2f; }
     progress { width: 100%; }
     code { word-break: break-all; }
+    a.file-link { color: #0b57d0; }
+    a.file-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -71,6 +73,34 @@
     const schemasInput = document.getElementById('schemas');
     let pollTimer = null;
 
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function fileLink(path, label) {
+      const text = escapeHtml(label || path);
+      const encoded = encodeURIComponent(path);
+      return `<a href="#" class="file-link" data-path="${encoded}" onclick="openExportPath(event)">${text}</a>`;
+    }
+
+    async function openExportPath(event) {
+      event.preventDefault();
+      const path = decodeURIComponent(event.currentTarget.dataset.path || '');
+      const res = await fetch('/api/reveal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.detail || 'Could not open file');
+      }
+    }
+
     async function refreshStatus() {
       const res = await fetch('/api/status');
       const data = await res.json();
@@ -102,7 +132,10 @@
         progressWrap.hidden = false;
         progressBar.value = progressBar.max;
         progressText.textContent = 'Export complete';
-        result.innerHTML = `<span class="ok">Saved to <code>${data.export.output_path}</code></span>`;
+        result.innerHTML = `<span class="ok">Saved to ${fileLink(data.export.output_path)}</span>` +
+          (data.export.diagram_path
+            ? `<br><span class="ok">Schema diagram: ${fileLink(data.export.diagram_path)}</span>`
+            : "");
         stopPolling();
       } else if (data.export.status === 'failed') {
         progressWrap.hidden = false;
