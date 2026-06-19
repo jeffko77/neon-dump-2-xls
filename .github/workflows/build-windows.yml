@@ -1,0 +1,40 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies and PyInstaller
+        run: |
+          uv sync
+          uv pip install pyinstaller
+
+      - name: Build PyInstaller bundle
+        run: uv run pyinstaller build/pyinstaller.spec --noconfirm --clean
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\lax-scheduler-export.iss
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LaxSchedulerExport-Windows
+          path: |
+            dist/LaxSchedulerExport-Setup.exe
+            dist/LaxSchedulerExport/

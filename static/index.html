@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Database Export</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+    body {
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      font: inherit;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .error { color: #b00020; }
+    .ok { color: #0a7a2f; }
+    progress { width: 100%; }
+    code { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Lax Scheduler Export</h1>
+  <p>Export all tables to a multi-sheet Excel workbook. Exports save to <code id="exports-dir">Documents\\LaxSchedulerExports</code>.</p>
+
+  <div class="card" id="status-card">
+    <h2>Connection</h2>
+    <p id="connection-status">Checking configuration...</p>
+  </div>
+
+  <div class="card">
+    <h2>Export</h2>
+    <label>
+      Schemas (comma-separated)
+      <input id="schemas" type="text" value="public,archive" style="width:100%; margin-top:0.25rem;" />
+    </label>
+    <p style="margin-top: 1rem;">
+      <button id="export-btn" disabled>Export to Excel</button>
+    </p>
+    <div id="progress-wrap" hidden>
+      <p id="progress-text"></p>
+      <progress id="progress-bar" value="0" max="100"></progress>
+    </div>
+    <p id="result"></p>
+  </div>
+
+  <script>
+    const connectionStatus = document.getElementById('connection-status');
+    const exportBtn = document.getElementById('export-btn');
+    const progressWrap = document.getElementById('progress-wrap');
+    const progressText = document.getElementById('progress-text');
+    const progressBar = document.getElementById('progress-bar');
+    const result = document.getElementById('result');
+    const schemasInput = document.getElementById('schemas');
+    let pollTimer = null;
+
+    async function refreshStatus() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+
+      if (data.exports_dir) {
+        document.getElementById('exports-dir').textContent = data.exports_dir;
+      }
+
+      if (data.configured) {
+        connectionStatus.innerHTML = `<span class="ok">Connected to <code>${data.host}</code></span>`;
+        exportBtn.disabled = data.export.status === 'running';
+      } else {
+        const setupHint = data.frozen
+          ? 'Re-run the installer and paste your readonly connection string on the Database Connection step.'
+          : 'Copy <code>config.example.json</code> to <code>config.json</code> with your readonly <code>database_url</code>.';
+        connectionStatus.innerHTML = `<span class="error">${data.config_error}</span><br><br>${setupHint}`;
+        exportBtn.disabled = true;
+      }
+
+      if (data.export.status === 'running') {
+        progressWrap.hidden = false;
+        const total = data.export.total_tables || 1;
+        const index = data.export.current_index || 0;
+        progressBar.max = total;
+        progressBar.value = index;
+        progressText.textContent = `Exporting ${data.export.current_table || '...'} (${index}/${total})`;
+        startPolling();
+      } else if (data.export.status === 'completed') {
+        progressWrap.hidden = false;
+        progressBar.value = progressBar.max;
+        progressText.textContent = 'Export complete';
+        result.innerHTML = `<span class="ok">Saved to <code>${data.export.output_path}</code></span>`;
+        stopPolling();
+      } else if (data.export.status === 'failed') {
+        progressWrap.hidden = false;
+        result.innerHTML = `<span class="error">${data.export.error}</span>`;
+        stopPolling();
+      }
+    }
+
+    function startPolling() {
+      if (pollTimer) return;
+      pollTimer = setInterval(refreshStatus, 1000);
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    exportBtn.addEventListener('click', async () => {
+      result.textContent = '';
+      const schemas = schemasInput.value.split(',').map(s => s.trim()).filter(Boolean);
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schemas }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        result.innerHTML = `<span class="error">${data.detail || 'Export failed to start'}</span>`;
+        return;
+      }
+      progressWrap.hidden = false;
+      progressText.textContent = 'Starting export...';
+      exportBtn.disabled = true;
+      startPolling();
+      await refreshStatus();
+    });
+
+    refreshStatus();
+  </script>
+</body>
+</html>
