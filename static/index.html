@@ -36,9 +36,16 @@
     code { word-break: break-all; }
     a.file-link { color: #0b57d0; }
     a.file-link:hover { text-decoration: underline; }
+    nav { margin-bottom: 1rem; font-size: 0.9rem; }
+    nav a { margin-right: 1rem; }
   </style>
 </head>
 <body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/export">Database Export</a>
+    <a href="/invoices">Invoices</a>
+  </nav>
   <h1>Lax Scheduler Export</h1>
   <p>Export all tables to a multi-sheet Excel workbook. Exports save to <code id="exports-dir">Documents\\LaxSchedulerExports</code>.</p>
 
@@ -102,7 +109,7 @@
     }
 
     async function refreshStatus() {
-      const res = await fetch('/api/status');
+      const res = await fetch('/api/export/status');
       const data = await res.json();
 
       if (data.exports_dir) {

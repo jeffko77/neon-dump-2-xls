@@ -9,7 +9,13 @@ datas = [
     (str(root / "static"), "static"),
     (str(root / "config.example.json"), "."),
     (str(root / "data"), "data"),
+    (str(root / "docs" / "INVOICE_PDF_FORMAT.md"), "docs"),
 ]
+
+for filename in ("Invoice Database.accdb", "Invoice  - Wentzville Lacrosse Club.pdf"):
+    bundle_file = root / filename
+    if bundle_file.exists():
+        datas.append((str(bundle_file), "."))
 
 hiddenimports = [
     "uvicorn.logging",
@@ -26,6 +32,18 @@ hiddenimports = [
     "psycopg2._psycopg",
     "encodings",
     "app.export.database_excel_export",
+    "app.invoice.routes",
+    "app.invoice.invoice_pdf",
+    "app.invoice.access_import",
+    "app.invoice.service",
+    "app.invoice.db",
+    "reportlab",
+    "reportlab.lib",
+    "reportlab.platypus",
+    "reportlab.graphics",
+    "PIL",
+    "PIL.Image",
+    "multipart",
 ]
 
 a = Analysis(

@@ -4,7 +4,8 @@ __pycache__/
 .env
 config.json
 exports/
-data/
+data/*
+!data/invoice_database_seed.json
 *.db
 *.xlsx
 .DS_Store

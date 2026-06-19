@@ -6,22 +6,34 @@ import sys
 from pathlib import Path
 
 
-def allowed_export_roots(exports_dir: Path, app_directory: Path) -> list[Path]:
+def allowed_export_roots(
+    exports_dir: Path,
+    app_directory: Path,
+    extra_roots: list[Path] | None = None,
+) -> list[Path]:
     roots: list[Path] = []
-    for candidate in (exports_dir, app_directory / "exports"):
+    for candidate in (exports_dir, app_directory / "exports", *(extra_roots or [])):
         try:
-            roots.append(candidate.expanduser().resolve())
+            resolved = candidate.expanduser().resolve()
+            if resolved not in roots:
+                roots.append(resolved)
         except OSError:
             continue
     return roots
 
 
-def validate_reveal_path(path: str, *, exports_dir: Path, app_directory: Path) -> Path:
+def validate_reveal_path(
+    path: str,
+    *,
+    exports_dir: Path,
+    app_directory: Path,
+    extra_roots: list[Path] | None = None,
+) -> Path:
     resolved = Path(path).expanduser().resolve()
     if not resolved.exists():
         raise ValueError(f"Path does not exist: {path}")
 
-    roots = allowed_export_roots(exports_dir, app_directory)
+    roots = allowed_export_roots(exports_dir, app_directory, extra_roots)
     if not any(resolved == root or root in resolved.parents for root in roots):
         raise ValueError("Path is outside the allowed export directories")
 

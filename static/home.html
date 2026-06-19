@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lax Scheduler Tools</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+    body {
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { opacity: 0.85; margin-bottom: 1.5rem; }
+    .grid {
+      display: grid;
+      gap: 1rem;
+    }
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .card:hover { border-color: #0b57d0; }
+    .card h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+    .card p { margin: 0; opacity: 0.85; }
+    code { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Lax Scheduler Tools</h1>
+  <p class="subtitle">Local tools for the assigner — database export and invoice billing.</p>
+
+  <div class="grid">
+    <a class="card" href="/export">
+      <h2>Database Export</h2>
+      <p>Export the Neon PostgreSQL scheduler database to a multi-sheet Excel workbook.</p>
+    </a>
+    <a class="card" href="/invoices">
+      <h2>Invoice Database</h2>
+      <p>Manage schools, invoices, payments, and schedules. Export PDF invoices for billing.</p>
+    </a>
+  </div>
+
+  <p style="margin-top: 1.5rem; font-size: 0.875rem; opacity: 0.8;">
+    Bookmark this page: <code id="app-url"></code>
+  </p>
+
+  <script>
+    document.getElementById('app-url').textContent = window.location.origin + '/';
+  </script>
+</body>
+</html>

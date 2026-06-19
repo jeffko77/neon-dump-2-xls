@@ -1,7 +1,7 @@
 [project]
 name = "neon-dump-2-xls"
-version = "0.1.0"
-description = "Local invoice database for schools, billing, payments, and schedules"
+version = "0.2.0"
+description = "Lax Scheduler Tools — Neon database export and invoice billing"
 readme = "idea.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -20,6 +20,7 @@ dependencies = [
 neon-dump = "app.main:main"
 invoice-app = "app.invoice_main:main"
 import-invoice-sources = "scripts.import_invoice_sources:main"
+export-invoice-seed = "scripts.export_invoice_seed:main"
 provision-readonly = "scripts.provision_readonly_user:main"
 
 [build-system]

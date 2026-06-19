@@ -135,9 +135,23 @@
     .error { color: var(--danger); }
     .ok { color: var(--ok); }
     code { word-break: break-all; }
+    .top-nav {
+      margin-bottom: 0;
+      font-size: 0.9rem;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: block;
+    }
+    .top-nav a { margin-right: 1rem; color: var(--accent); text-decoration: none; }
+    .top-nav a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
+  <nav class="top-nav">
+    <a href="/">Home</a>
+    <a href="/export">Database Export</a>
+    <a href="/invoices">Invoices</a>
+  </nav>
   <header>
     <div>
       <h1>Invoice Database</h1>
@@ -147,28 +161,28 @@
   </header>
 
   <nav id="tabs">
-    <button data-tab="schools" class="active">Schools</button>
-    <button data-tab="invoices">Invoices</button>
+    <button data-tab="invoices" class="active">Invoices</button>
+    <button data-tab="schools">Schools</button>
     <button data-tab="payments">Payments</button>
     <button data-tab="games">Schedule</button>
     <button data-tab="backup">Backup</button>
   </nav>
 
   <main>
-    <section class="panel active" id="panel-schools">
-      <div class="toolbar">
-        <h2>Schools</h2>
-        <button class="primary" onclick="openSchoolForm()">Add school</button>
-      </div>
-      <div class="table-wrap"><table id="schools-table"></table></div>
-    </section>
-
-    <section class="panel" id="panel-invoices">
+    <section class="panel active" id="panel-invoices">
       <div class="toolbar">
         <h2>Invoices</h2>
         <button class="primary" onclick="openInvoiceForm()">Create invoice</button>
       </div>
       <div class="table-wrap"><table id="invoices-table"></table></div>
+    </section>
+
+    <section class="panel" id="panel-schools">
+      <div class="toolbar">
+        <h2>Schools</h2>
+        <button class="primary" onclick="openSchoolForm()">Add school</button>
+      </div>
+      <div class="table-wrap"><table id="schools-table"></table></div>
     </section>
 
     <section class="panel" id="panel-payments">
@@ -190,8 +204,11 @@
     <section class="panel" id="panel-backup">
       <h2>Backup & restore</h2>
       <div class="card">
-        <p>Reload all data from <code>Invoice Database.accdb</code> and the sample PDF in the project folder.</p>
-        <p><button class="primary" onclick="reimportAccess()">Re-import from Access database</button></p>
+        <p>Restore the original schools, invoices, payments, and schedule from the bundled dataset. This replaces all current data.</p>
+        <p><button class="primary" onclick="resetToSeed()">Reset to original dataset</button></p>
+        <p id="seed-import-result"></p>
+        <p class="muted">Developer option: re-import from <code>Invoice Database.accdb</code> (requires mdbtools).</p>
+        <p><button onclick="reimportAccess()">Re-import from Access database</button></p>
         <p id="access-import-result"></p>
       </div>
       <div class="card">
@@ -620,7 +637,7 @@
 
     async function refreshAll() {
       const [status, schools, invoices, payments, games] = await Promise.all([
-        api('/api/status'),
+        api('/api/invoice-db/status'),
         api('/api/schools'),
         api('/api/invoices'),
         api('/api/payments'),
@@ -855,6 +872,20 @@
       try {
         const data = await api('/api/backup/save', { method: 'POST' });
         resultEl.innerHTML = `<span class="ok">Saved backup files:</span><br><code>${escapeHtml(data.json_path)}</code><br><code>${escapeHtml(data.excel_path)}</code>`;
+      } catch (err) {
+        resultEl.innerHTML = `<span class="error">${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    async function resetToSeed() {
+      const resultEl = document.getElementById('seed-import-result');
+      if (!confirm('Replace all current data with the original bundled dataset?')) return;
+      resultEl.textContent = 'Restoring original dataset...';
+      try {
+        const data = await api('/api/import/seed', { method: 'POST' });
+        const c = data.counts;
+        resultEl.innerHTML = `<span class="ok">Restored ${c.schools} schools, ${c.invoices} invoices, ${c.payments} payments, ${c.games} games.</span>`;
+        await refreshAll();
       } catch (err) {
         resultEl.innerHTML = `<span class="error">${escapeHtml(err.message)}</span>`;
       }

@@ -25,6 +25,7 @@ from app.connection import (
     load_database_url,
 )
 from app.export.database_excel_export import DEFAULT_SCHEMAS, export_database_to_excel
+from app.invoice.routes import BACKUPS_DIR, init_invoice_db, register_invoice_routes
 from app.reveal import reveal_path, validate_reveal_path
 
 
@@ -62,8 +63,9 @@ class ExportState:
 export_state = ExportState()
 export_lock = threading.Lock()
 
-app = FastAPI(title="Neon Database Excel Export")
+app = FastAPI(title="Lax Scheduler Tools")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+register_invoice_routes(app)
 
 
 class RevealRequest(BaseModel):
@@ -75,14 +77,33 @@ class ExportRequest(BaseModel):
     schemas: list[str] = Field(default_factory=lambda: list(DEFAULT_SCHEMAS))
 
 
+@app.on_event("startup")
+def startup() -> None:
+    init_invoice_db()
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index() -> HTMLResponse:
+def home() -> HTMLResponse:
+    html = (STATIC_DIR / "home.html").read_text(encoding="utf-8")
+    return HTMLResponse(html)
+
+
+@app.get("/export", response_class=HTMLResponse)
+def export_page() -> HTMLResponse:
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     return HTMLResponse(html)
 
 
-@app.get("/api/status")
-def status() -> dict:
+@app.get("/invoices", response_class=HTMLResponse)
+def invoices_page() -> HTMLResponse:
+    html = (STATIC_DIR / "invoice.html").read_text(encoding="utf-8")
+    return HTMLResponse(html)
+
+
+@app.get("/api/export/status")
+def export_status() -> dict:
     try:
         database_url = load_database_url()
         configured = True
@@ -172,8 +193,6 @@ def start_export(request: ExportRequest) -> dict:
     return {"status": "running", "output_path": str(output_path)}
 
 
-
-
 @app.post("/api/reveal")
 def reveal_file(request: RevealRequest) -> dict:
     try:
@@ -181,12 +200,14 @@ def reveal_file(request: RevealRequest) -> dict:
             request.path,
             exports_dir=EXPORTS_DIR,
             app_directory=app_dir(),
+            extra_roots=[BACKUPS_DIR, BACKUPS_DIR.parent],
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     reveal_path(resolved)
     return {"status": "ok", "path": str(resolved)}
+
 
 @app.get("/api/export/latest")
 def latest_export() -> dict:
@@ -224,12 +245,11 @@ def open_browser_when_ready(url: str, port: int) -> None:
 def main() -> None:
     try:
         ensure_stdio()
-        EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
         host = "127.0.0.1"
-        port = int(os.environ.get("NEON_DUMP_PORT", "8765"))
+        port = int(os.environ.get("LAX_SCHEDULER_PORT", os.environ.get("NEON_DUMP_PORT", "8765")))
         url = f"http://{host}:{port}/"
         if not is_frozen():
-            print(f"Starting Neon export app at {url}")
+            print(f"Starting Lax Scheduler Tools at {url}")
         threading.Thread(
             target=open_browser_when_ready,
             args=(url, port),
