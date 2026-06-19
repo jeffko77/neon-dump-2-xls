@@ -64,11 +64,11 @@ begin
     case Ch of
       '\': Result := Result + '\\';
       '"': Result := Result + '\"';
-      #8: Result := Result + '\b';
-      #9: Result := Result + '\t';
-      #10: Result := Result + '\n';
-      #13: Result := Result + '\r';
-      #12: Result := Result + '\f';
+      Chr(8): Result := Result + '\b';
+      Chr(9): Result := Result + '\t';
+      Chr(10): Result := Result + '\n';
+      Chr(13): Result := Result + '\r';
+      Chr(12): Result := Result + '\f';
     else
       if Ord(Ch) < 32 then
         Result := Result + '\u' + IntToHex(Ord(Ch), 4)
@@ -131,9 +131,9 @@ begin
       Exit;
 
     ConfigPath := ExpandConstant('{app}\config.json');
-    ConfigContent := '{' + #13#10 +
-      '  "database_url": "' + JsonEscape(Url) + '"' + #13#10 +
-      '}' + #13#10;
+    ConfigContent := '{' + Chr(13) + Chr(10) +
+      '  "database_url": "' + JsonEscape(Url) + '"' + Chr(13) + Chr(10) +
+      '}' + Chr(13) + Chr(10);
     SaveStringToFile(ConfigPath, ConfigContent, False);
   end;
 end;
