@@ -82,7 +82,7 @@ begin
 
   ConnectionPage.Add('Connection string:', False);
   ConnectionPage.Values[0] := '';
-  ConnectionPage.Edits[0].PasswordChar := '#';
+  ConnectionPage.Edits[0].PasswordChar := '*';
 
   ConfigureLaterCheck := TNewCheckBox.Create(ConnectionPage);
   ConfigureLaterCheck.Parent := ConnectionPage.Surface;
