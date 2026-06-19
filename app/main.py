@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import socket
 import sys
 import threading
+import time
+import traceback
 import webbrowser
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -191,15 +194,58 @@ def latest_export() -> dict:
         return asdict(export_state)
 
 
-def main() -> None:
-    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    host = "127.0.0.1"
-    port = int(os.environ.get("NEON_DUMP_PORT", "8765"))
-    url = f"http://{host}:{port}/"
+def ensure_stdio() -> None:
     if not is_frozen():
-        print(f"Starting Neon export app at {url}")
+        return
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+
+
+def write_startup_error(exc: BaseException) -> None:
+    if not is_frozen():
+        return
+    log_path = app_dir() / "startup-error.log"
+    log_path.write_text(traceback.format_exc(), encoding="utf-8")
+
+
+def open_browser_when_ready(url: str, port: int) -> None:
+    for _ in range(100):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                webbrowser.open(url)
+                return
+        except OSError:
+            time.sleep(0.1)
     webbrowser.open(url)
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+
+
+def main() -> None:
+    try:
+        ensure_stdio()
+        EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        host = "127.0.0.1"
+        port = int(os.environ.get("NEON_DUMP_PORT", "8765"))
+        url = f"http://{host}:{port}/"
+        if not is_frozen():
+            print(f"Starting Neon export app at {url}")
+        threading.Thread(
+            target=open_browser_when_ready,
+            args=(url, port),
+            daemon=True,
+        ).start()
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level="warning",
+            log_config=None,
+            access_log=False,
+        )
+    except Exception as exc:
+        write_startup_error(exc)
+        raise
 
 
 if __name__ == "__main__":
