@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice Database</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --border: #ccc;
+      --accent: #0b57d0;
+      --danger: #b00020;
+      --ok: #0a7a2f;
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+    body { margin: 0; background: Canvas; color: CanvasText; }
+    header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    header h1 { margin: 0; font-size: 1.25rem; }
+    .meta { font-size: 0.875rem; opacity: 0.85; }
+    nav {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    nav button {
+      border: 1px solid var(--border);
+      background: transparent;
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      cursor: pointer;
+      font: inherit;
+    }
+    nav button.active { background: var(--accent); color: white; border-color: var(--accent); }
+    main { padding: 1rem 1.5rem 2rem; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    button, .btn {
+      font: inherit;
+      padding: 0.45rem 0.85rem;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: ButtonFace;
+      color: ButtonText;
+    }
+    button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    button.danger { color: var(--danger); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.45rem 0.55rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: rgba(127,127,127,0.12); }
+    .table-wrap { overflow-x: auto; }
+    .actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid var(--border);
+    }
+    .badge.paid { color: var(--ok); }
+    .badge.due { color: var(--danger); }
+    dialog {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0;
+      max-width: 720px;
+      width: calc(100vw - 2rem);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.35); }
+    .dialog-body { padding: 1rem 1.25rem 1.25rem; }
+    .dialog-header {
+      padding: 1rem 1.25rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dialog-header h2 { margin: 0; font-size: 1.1rem; }
+    form.grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; }
+    input, select, textarea {
+      font: inherit;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: Field;
+      color: FieldText;
+    }
+    textarea { min-height: 4rem; resize: vertical; }
+    .full { grid-column: 1 / -1; }
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .muted { opacity: 0.8; font-size: 0.875rem; }
+    .error { color: var(--danger); }
+    .ok { color: var(--ok); }
+    code { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Invoice Database</h1>
+      <div class="meta">Local billing + scheduling for lacrosse and field hockey schools</div>
+    </div>
+    <div class="meta" id="status-meta">Loading...</div>
+  </header>
+
+  <nav id="tabs">
+    <button data-tab="schools" class="active">Schools</button>
+    <button data-tab="invoices">Invoices</button>
+    <button data-tab="payments">Payments</button>
+    <button data-tab="games">Schedule</button>
+    <button data-tab="backup">Backup</button>
+  </nav>
+
+  <main>
+    <section class="panel active" id="panel-schools">
+      <div class="toolbar">
+        <h2>Schools</h2>
+        <button class="primary" onclick="openSchoolForm()">Add school</button>
+      </div>
+      <div class="table-wrap"><table id="schools-table"></table></div>
+    </section>
+
+    <section class="panel" id="panel-invoices">
+      <div class="toolbar">
+        <h2>Invoices</h2>
+        <button class="primary" onclick="openInvoiceForm()">Create invoice</button>
+      </div>
+      <div class="table-wrap"><table id="invoices-table"></table></div>
+    </section>
+
+    <section class="panel" id="panel-payments">
+      <div class="toolbar">
+        <h2>Payments</h2>
+        <button class="primary" onclick="openPaymentForm()">Record payment</button>
+      </div>
+      <div class="table-wrap"><table id="payments-table"></table></div>
+    </section>
+
+    <section class="panel" id="panel-games">
+      <div class="toolbar">
+        <h2>Game schedule</h2>
+        <button class="primary" onclick="openGameForm()">Add game</button>
+      </div>
+      <div class="table-wrap"><table id="games-table"></table></div>
+    </section>
+
+    <section class="panel" id="panel-backup">
+      <h2>Backup & restore</h2>
+      <div class="card">
+        <p>Reload all data from <code>Invoice Database.accdb</code> and the sample PDF in the project folder.</p>
+        <p><button class="primary" onclick="reimportAccess()">Re-import from Access database</button></p>
+        <p id="access-import-result"></p>
+      </div>
+      <div class="card">
+        <p>Export all schools, invoices, payments, and games for offline backup.</p>
+        <p>
+          <button onclick="downloadBackup('json')">Download JSON</button>
+          <button onclick="downloadBackup('excel')">Download Excel</button>
+          <button class="primary" onclick="saveLocalBackup()">Save to backups folder</button>
+        </p>
+        <p class="muted" id="backup-paths"></p>
+        <p id="backup-result"></p>
+      </div>
+      <div class="card">
+        <p>Restore from a JSON backup file. This replaces all current data by default.</p>
+        <label>
+          Backup file
+          <input type="file" id="import-file" accept="application/json,.json" />
+        </label>
+        <p style="margin-top:0.75rem;">
+          <label><input type="checkbox" id="import-replace" checked /> Replace existing data</label>
+        </p>
+        <p style="margin-top:0.75rem;">
+          <button class="primary" onclick="importBackup()">Import backup</button>
+        </p>
+        <p id="import-result"></p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="school-dialog">
+    <div class="dialog-header"><h2 id="school-dialog-title">School</h2></div>
+    <form class="dialog-body grid" id="school-form" onsubmit="submitSchool(event)">
+      <input type="hidden" id="school-id" />
+      <label class="full">School name<input required id="school-name" /></label>
+      <label>Address<input id="school-address" /></label>
+      <label>City<input id="school-city" /></label>
+      <label>State<input id="school-state" maxlength="2" /></label>
+      <label>ZIP<input id="school-zip" /></label>
+      <label>Field location<input id="school-field-location" /></label>
+      <label>Subsite<input id="school-subsite" /></label>
+      <label>Varsity time<input id="school-varsity-time" placeholder="16:00" /></label>
+      <label>JV time<input id="school-jv-time" placeholder="17:30" /></label>
+      <label>Rank<input type="number" id="school-rank" /></label>
+      <label><span>Parkway district</span><input type="checkbox" id="school-parkway" /></label>
+      <label class="full">Sports (comma-separated)<input id="school-sports" placeholder="Lacrosse, Field Hockey" /></label>
+      <div class="dialog-actions full">
+        <button type="button" onclick="closeDialog('school-dialog')">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="invoice-dialog">
+    <div class="dialog-header"><h2 id="invoice-dialog-title">Invoice</h2></div>
+    <form class="dialog-body grid" id="invoice-form" onsubmit="submitInvoice(event)">
+      <input type="hidden" id="invoice-id" />
+      <label>School
+        <select required id="invoice-school-id"></select>
+      </label>
+      <label>Season year<input type="number" required id="invoice-season-year" /></label>
+      <label>Sport
+        <select required id="invoice-sport">
+          <option>Lacrosse</option>
+          <option>Field Hockey</option>
+        </select>
+      </label>
+      <div id="invoice-fee-fields" class="full grid"></div>
+      <label class="full">Total (calculated)<input readonly id="invoice-total" /></label>
+      <label class="full">Address note<input id="invoice-address-note" /></label>
+      <label class="full">Collection status<input id="invoice-collection-status" placeholder="SECOND REQUEST: Please Pay Promptly" /></label>
+      <label class="full">Notes<textarea id="invoice-notes"></textarea></label>
+      <div class="dialog-actions full">
+        <button type="button" onclick="closeDialog('invoice-dialog')">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="payment-dialog">
+    <div class="dialog-header"><h2 id="payment-dialog-title">Payment</h2></div>
+    <form class="dialog-body grid" id="payment-form" onsubmit="submitPayment(event)">
+      <input type="hidden" id="payment-id" />
+      <label class="full">Invoice
+        <select required id="payment-invoice-id"></select>
+      </label>
+      <label>Amount paid<input type="number" step="0.01" id="payment-amount" /></label>
+      <label>Date paid<input type="date" id="payment-date" /></label>
+      <label>Payment method<input id="payment-method" placeholder="Check" /></label>
+      <label class="full">Notes<textarea id="payment-notes"></textarea></label>
+      <div class="dialog-actions full">
+        <button type="button" onclick="closeDialog('payment-dialog')">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="game-dialog">
+    <div class="dialog-header"><h2 id="game-dialog-title">Game</h2></div>
+    <form class="dialog-body grid" id="game-form" onsubmit="submitGame(event)">
+      <input type="hidden" id="game-id" />
+      <label>Date<input type="date" required id="game-date" /></label>
+      <label>Time<input id="game-time" placeholder="16:00" /></label>
+      <label>Level
+        <select id="game-level">
+          <option value="">—</option>
+          <option>Varsity</option>
+          <option>JV</option>
+          <option>C Team</option>
+        </select>
+      </label>
+      <label>Sport
+        <select id="game-sport">
+          <option>Lacrosse</option>
+          <option>Field Hockey</option>
+        </select>
+      </label>
+      <label>Season year<input type="number" id="game-season-year" /></label>
+      <label>Home school
+        <select id="game-home-school-id"><option value="">—</option></select>
+      </label>
+      <label>Away school
+        <select id="game-away-school-id"><option value="">—</option></select>
+      </label>
+      <label class="full">Field location<input id="game-field-location" /></label>
+      <div class="dialog-actions full">
+        <button type="button" onclick="closeDialog('game-dialog')">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const FALLBACK_FEE_SCHEDULE = {
+      fees: [
+        { key: 'base_amount', label: 'Base amount', default: 110, options: [{ label: '$110.00 — Schedule preparation', amount: 110 }] },
+        { key: 'revision_amount', label: 'Revision fee', default: 0, options: [{ label: '$0.00 — Not applicable', amount: 0 }, { label: '$50.00 — Revision', amount: 50 }] },
+        { key: 'dual_sport_fee', label: 'Dual-sport fee', default: 0, options: [{ label: '$0.00 — Single sport', amount: 0 }, { label: '$100.00 — Lacrosse + Field Hockey', amount: 100 }] },
+        { key: 'ranking_services', label: 'Ranking services', default: 0, options: [{ label: '$0.00 — Not enrolled', amount: 0 }, { label: '$12.00 — Ranking services', amount: 12 }] },
+        { key: 'c_team_scheduling', label: 'C-team scheduling', default: 0, options: [{ label: '$0.00 — Not enrolled', amount: 0 }, { label: '$20.00 — C-team scheduling', amount: 20 }] },
+        { key: 'fh_ranking_services', label: 'FH ranking services', default: 0, options: [{ label: '$0.00 — Not enrolled', amount: 0 }, { label: '$15.00 — Field Hockey ranking', amount: 15 }] },
+      ],
+      defaults_by_sport: {
+        Lacrosse: { base_amount: 110, revision_amount: 0, dual_sport_fee: 0, ranking_services: 0, c_team_scheduling: 0, fh_ranking_services: 0 },
+        'Field Hockey': { base_amount: 110, revision_amount: 0, dual_sport_fee: 0, ranking_services: 0, c_team_scheduling: 0, fh_ranking_services: 15 },
+      },
+    };
+
+    const state = { schools: [], invoices: [], payments: [], games: [], status: null, feeSchedule: null };
+
+    function ensureFeeSchedule() {
+      if (!state.feeSchedule) state.feeSchedule = FALLBACK_FEE_SCHEDULE;
+      return state.feeSchedule;
+    }
+
+    async function loadFeeSchedule() {
+      if (state.feeSchedule && state.feeSchedule !== FALLBACK_FEE_SCHEDULE) return state.feeSchedule;
+      try {
+        state.feeSchedule = await api('/api/fee-schedule');
+      } catch (_err) {
+        state.feeSchedule = FALLBACK_FEE_SCHEDULE;
+      }
+      return state.feeSchedule;
+    }
+
+    function money(value) {
+      if (value == null || value === '') return '';
+      return '$' + Number(value).toFixed(2);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      return data;
+    }
+
+    function closeDialog(id) {
+      document.getElementById(id).close();
+    }
+
+    function feeInputId(key) {
+      return `invoice-fee-${key}`;
+    }
+
+    function feeCustomId(key) {
+      return `invoice-fee-${key}-custom`;
+    }
+
+    function renderInvoiceFeeFields(values = {}) {
+      ensureFeeSchedule();
+      const container = document.getElementById('invoice-fee-fields');
+
+      container.innerHTML = state.feeSchedule.fees.map(fee => {
+        const selectId = feeInputId(fee.key);
+        const customId = feeCustomId(fee.key);
+        const options = fee.options.map(option =>
+          `<option value="${option.amount}">${escapeHtml(option.label)}</option>`
+        ).join('');
+        return `
+          <label>${escapeHtml(fee.label)}
+            <select id="${selectId}" data-fee-key="${fee.key}">
+              ${options}
+              <option value="custom">Custom amount...</option>
+            </select>
+            <input type="number" step="0.01" id="${customId}" hidden />
+          </label>
+        `;
+      }).join('');
+
+      state.feeSchedule.fees.forEach(fee => {
+        const select = document.getElementById(feeInputId(fee.key));
+        const custom = document.getElementById(feeCustomId(fee.key));
+        select.addEventListener('change', () => {
+          const isCustom = select.value === 'custom';
+          custom.hidden = !isCustom;
+          if (!isCustom) custom.value = '';
+          calcInvoiceTotal();
+        });
+        custom.addEventListener('input', calcInvoiceTotal);
+      });
+
+      setInvoiceFeeValues(values);
+    }
+
+    function getInvoiceFeeValue(key) {
+      const select = document.getElementById(feeInputId(key));
+      if (!select) return 0;
+      if (select.value === 'custom') {
+        return Number(document.getElementById(feeCustomId(key)).value || 0);
+      }
+      return Number(select.value || 0);
+    }
+
+    function getInvoiceFeeValues() {
+      if (!state.feeSchedule) return {};
+      return Object.fromEntries(
+        state.feeSchedule.fees.map(fee => [fee.key, getInvoiceFeeValue(fee.key)])
+      );
+    }
+
+    function setInvoiceFeeValue(key, amount) {
+      const select = document.getElementById(feeInputId(key));
+      const custom = document.getElementById(feeCustomId(key));
+      if (!select || !custom) return;
+
+      const numeric = Number(amount || 0);
+      const match = Array.from(select.options).find(option => option.value !== 'custom' && Number(option.value) === numeric);
+      if (match) {
+        select.value = String(numeric);
+        custom.hidden = true;
+        custom.value = '';
+      } else {
+        select.value = 'custom';
+        custom.hidden = false;
+        custom.value = numeric.toFixed(2);
+      }
+    }
+
+    function setInvoiceFeeValues(values) {
+      if (!state.feeSchedule) return;
+      state.feeSchedule.fees.forEach(fee => {
+        const amount = values[fee.key] ?? fee.default ?? 0;
+        setInvoiceFeeValue(fee.key, amount);
+      });
+      calcInvoiceTotal();
+    }
+
+    function invoiceDefaultsForForm() {
+      const sport = document.getElementById('invoice-sport').value;
+      const defaults = { ...(state.feeSchedule?.defaults_by_sport?.[sport] || {}) };
+      const schoolId = Number(document.getElementById('invoice-school-id').value);
+      const school = state.schools.find(s => s.id === schoolId);
+      const sports = school?.sports || [];
+      if (sports.includes('Lacrosse') && sports.includes('Field Hockey')) {
+        defaults.dual_sport_fee = 100;
+        defaults.revision_amount = 50;
+      }
+      return defaults;
+    }
+
+    function applyInvoiceFeeDefaults() {
+      setInvoiceFeeValues(invoiceDefaultsForForm());
+    }
+
+    function calcInvoiceTotal() {
+      if (!state.feeSchedule) return 0;
+      const total = state.feeSchedule.fees.reduce(
+        (sum, fee) => sum + getInvoiceFeeValue(fee.key),
+        0,
+      );
+      document.getElementById('invoice-total').value = money(total);
+      return total;
+    }
+
+    document.getElementById('invoice-sport').addEventListener('change', () => {
+      if (!document.getElementById('invoice-id').value) {
+        applyInvoiceFeeDefaults();
+      }
+    });
+    document.getElementById('invoice-form').addEventListener('change', (event) => {
+      if (event.target.id === 'invoice-school-id' && !document.getElementById('invoice-id').value) {
+        applyInvoiceFeeDefaults();
+      }
+    });
+
+    document.getElementById('tabs').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-tab]');
+      if (!button) return;
+      document.querySelectorAll('#tabs button').forEach(el => el.classList.toggle('active', el === button));
+      document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+      document.getElementById('panel-' + button.dataset.tab).classList.add('active');
+    });
+
+    function schoolOptions(selectedId = '') {
+      return state.schools.map(s =>
+        `<option value="${s.id}" ${String(s.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(s.school_name)}</option>`
+      ).join('');
+    }
+
+    function invoiceOptions(selectedId = '') {
+      return state.invoices.map(i =>
+        `<option value="${i.id}" ${String(i.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(i.school_name)} — ${i.season_year} ${escapeHtml(i.sport)} (${money(i.total_amount)})</option>`
+      ).join('');
+    }
+
+    function renderSchools() {
+      const rows = [
+        '<tr><th>School</th><th>Location</th><th>Sports</th><th>Times</th><th>Parkway</th><th></th></tr>',
+        ...state.schools.map(s => `<tr>
+          <td><strong>${escapeHtml(s.school_name)}</strong><br><span class="muted">${escapeHtml(s.address || '')}</span></td>
+          <td>${escapeHtml([s.city, s.state, s.zip].filter(Boolean).join(', '))}<br><span class="muted">${escapeHtml(s.field_location || '')}</span></td>
+          <td>${escapeHtml((s.sports || []).join(', '))}</td>
+          <td>V ${escapeHtml(s.varsity_game_time || '—')}<br>JV ${escapeHtml(s.jv_game_time || '—')}</td>
+          <td>${s.parkway_district ? 'Y' : 'N'}</td>
+          <td class="actions">
+            <button onclick="openSchoolForm(${s.id})">Edit</button>
+            <button class="danger" onclick="deleteSchool(${s.id})">Delete</button>
+          </td>
+        </tr>`),
+      ];
+      document.getElementById('schools-table').innerHTML = rows.join('');
+    }
+
+    function renderInvoices() {
+      const rows = [
+        '<tr><th>School</th><th>Season</th><th>Sport</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr>',
+        ...state.invoices.map(i => {
+          const paid = i.balance_due <= 0;
+          return `<tr>
+            <td>${escapeHtml(i.school_name)}</td>
+            <td>${i.season_year}</td>
+            <td>${escapeHtml(i.sport)}</td>
+            <td>${money(i.total_amount)}</td>
+            <td>${money(i.amount_paid)}</td>
+            <td>${money(i.balance_due)}</td>
+            <td>${paid ? '<span class="badge paid">Paid</span>' : '<span class="badge due">Due</span>'}<br>${escapeHtml(i.collection_status || '')}</td>
+            <td class="actions">
+              <button onclick="exportInvoicePdf(${i.id})">PDF</button>
+              <button onclick="openInvoiceForm(${i.id})">Edit</button>
+              <button onclick="openPaymentForm(null, ${i.id})">Pay</button>
+              <button class="danger" onclick="deleteInvoice(${i.id})">Delete</button>
+            </td>
+          </tr>`;
+        }),
+      ];
+      document.getElementById('invoices-table').innerHTML = rows.join('');
+    }
+
+    function renderPayments() {
+      const rows = [
+        '<tr><th>School</th><th>Invoice</th><th>Amount</th><th>Date</th><th>Method</th><th></th></tr>',
+        ...state.payments.map(p => `<tr>
+          <td>${escapeHtml(p.school_name)}</td>
+          <td>${p.season_year} ${escapeHtml(p.sport)}</td>
+          <td>${money(p.amount_paid)}</td>
+          <td>${escapeHtml(p.date_paid || '—')}</td>
+          <td>${escapeHtml(p.payment_method || '')}</td>
+          <td class="actions">
+            <button onclick="openPaymentForm(${p.id})">Edit</button>
+            <button class="danger" onclick="deletePayment(${p.id})">Delete</button>
+          </td>
+        </tr>`),
+      ];
+      document.getElementById('payments-table').innerHTML = rows.join('');
+    }
+
+    function renderGames() {
+      const rows = [
+        '<tr><th>Date</th><th>Time</th><th>Level</th><th>Matchup</th><th>Field</th><th>Sport</th><th></th></tr>',
+        ...state.games.map(g => `<tr>
+          <td>${escapeHtml(g.game_date)}</td>
+          <td>${escapeHtml(g.game_time || '—')}</td>
+          <td>${escapeHtml(g.level || '')}</td>
+          <td>${escapeHtml(g.home_school_name || 'TBD')} vs ${escapeHtml(g.away_school_name || 'TBD')}</td>
+          <td>${escapeHtml(g.field_location || '')}</td>
+          <td>${escapeHtml(g.sport)}</td>
+          <td class="actions">
+            <button onclick="openGameForm(${g.id})">Edit</button>
+            <button class="danger" onclick="deleteGame(${g.id})">Delete</button>
+          </td>
+        </tr>`),
+      ];
+      document.getElementById('games-table').innerHTML = rows.join('');
+    }
+
+    function renderStatus() {
+      const s = state.status;
+      if (!s) return;
+      document.getElementById('status-meta').innerHTML =
+        `${s.counts.schools} schools · ${s.counts.invoices} invoices · ${s.counts.payments} payments · ${s.counts.games} games<br>` +
+        `<code>${escapeHtml(s.database_path)}</code>`;
+      document.getElementById('backup-paths').innerHTML =
+        `Backups folder: <code>${escapeHtml(s.backups_dir)}</code>`;
+    }
+
+    async function refreshAll() {
+      const [status, schools, invoices, payments, games] = await Promise.all([
+        api('/api/status'),
+        api('/api/schools'),
+        api('/api/invoices'),
+        api('/api/payments'),
+        api('/api/games'),
+      ]);
+      state.status = status;
+      state.schools = schools;
+      state.invoices = invoices;
+      state.payments = payments;
+      state.games = games;
+      await loadFeeSchedule();
+      renderStatus();
+      renderSchools();
+      renderInvoices();
+      renderPayments();
+      renderGames();
+    }
+
+    function openSchoolForm(id = null) {
+      const dialog = document.getElementById('school-dialog');
+      document.getElementById('school-dialog-title').textContent = id ? 'Edit school' : 'Add school';
+      document.getElementById('school-id').value = id || '';
+      const school = id ? state.schools.find(s => s.id === id) : null;
+      document.getElementById('school-name').value = school?.school_name || '';
+      document.getElementById('school-address').value = school?.address || '';
+      document.getElementById('school-city').value = school?.city || '';
+      document.getElementById('school-state').value = school?.state || '';
+      document.getElementById('school-zip').value = school?.zip || '';
+      document.getElementById('school-field-location').value = school?.field_location || '';
+      document.getElementById('school-subsite').value = school?.subsite || '';
+      document.getElementById('school-varsity-time').value = school?.varsity_game_time || '';
+      document.getElementById('school-jv-time').value = school?.jv_game_time || '';
+      document.getElementById('school-rank').value = school?.rank ?? '';
+      document.getElementById('school-parkway').checked = !!school?.parkway_district;
+      document.getElementById('school-sports').value = (school?.sports || []).join(', ');
+      dialog.showModal();
+    }
+
+    async function submitSchool(event) {
+      event.preventDefault();
+      const id = document.getElementById('school-id').value;
+      const payload = {
+        school_name: document.getElementById('school-name').value.trim(),
+        address: document.getElementById('school-address').value || null,
+        city: document.getElementById('school-city').value || null,
+        state: document.getElementById('school-state').value || null,
+        zip: document.getElementById('school-zip').value || null,
+        field_location: document.getElementById('school-field-location').value || null,
+        subsite: document.getElementById('school-subsite').value || null,
+        varsity_game_time: document.getElementById('school-varsity-time').value || null,
+        jv_game_time: document.getElementById('school-jv-time').value || null,
+        rank: document.getElementById('school-rank').value ? Number(document.getElementById('school-rank').value) : null,
+        parkway_district: document.getElementById('school-parkway').checked,
+        sports: document.getElementById('school-sports').value.split(',').map(s => s.trim()).filter(Boolean),
+      };
+      try {
+        if (id) await api(`/api/schools/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        else await api('/api/schools', { method: 'POST', body: JSON.stringify(payload) });
+        closeDialog('school-dialog');
+        await refreshAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteSchool(id) {
+      if (!confirm('Delete this school and related invoices?')) return;
+      await api(`/api/schools/${id}`, { method: 'DELETE' });
+      await refreshAll();
+    }
+
+    function openInvoiceForm(id = null) {
+      const dialog = document.getElementById('invoice-dialog');
+      document.getElementById('invoice-dialog-title').textContent = id ? 'Edit invoice' : 'Create invoice';
+      document.getElementById('invoice-id').value = id || '';
+      document.getElementById('invoice-school-id').innerHTML = schoolOptions();
+      const invoice = id ? state.invoices.find(i => i.id === id) : null;
+      document.getElementById('invoice-school-id').value = invoice?.school_id || state.schools[0]?.id || '';
+      document.getElementById('invoice-season-year').value = invoice?.season_year || new Date().getFullYear();
+      document.getElementById('invoice-sport').value = invoice?.sport || 'Field Hockey';
+
+      loadFeeSchedule().then(() => {
+        const feeValues = invoice ? {
+          base_amount: invoice.base_amount,
+          revision_amount: invoice.revision_amount,
+          dual_sport_fee: invoice.dual_sport_fee,
+          ranking_services: invoice.ranking_services,
+          c_team_scheduling: invoice.c_team_scheduling,
+          fh_ranking_services: invoice.fh_ranking_services,
+        } : invoiceDefaultsForForm();
+        renderInvoiceFeeFields(feeValues);
+      });
+
+      document.getElementById('invoice-address-note').value = invoice?.address_note || '';
+      document.getElementById('invoice-collection-status').value = invoice?.collection_status || '';
+      document.getElementById('invoice-notes').value = invoice?.notes || '';
+      dialog.showModal();
+    }
+
+    async function submitInvoice(event) {
+      event.preventDefault();
+      const id = document.getElementById('invoice-id').value;
+      const fees = getInvoiceFeeValues();
+      const payload = {
+        school_id: Number(document.getElementById('invoice-school-id').value),
+        season_year: Number(document.getElementById('invoice-season-year').value),
+        sport: document.getElementById('invoice-sport').value,
+        base_amount: fees.base_amount,
+        revision_amount: fees.revision_amount,
+        dual_sport_fee: fees.dual_sport_fee,
+        ranking_services: fees.ranking_services,
+        c_team_scheduling: fees.c_team_scheduling,
+        fh_ranking_services: fees.fh_ranking_services,
+        address_note: document.getElementById('invoice-address-note').value || null,
+        collection_status: document.getElementById('invoice-collection-status').value || null,
+        notes: document.getElementById('invoice-notes').value || null,
+      };
+      try {
+        if (id) await api(`/api/invoices/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        else await api('/api/invoices', { method: 'POST', body: JSON.stringify(payload) });
+        closeDialog('invoice-dialog');
+        await refreshAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function exportInvoicePdf(id) {
+      window.location.href = `/api/invoices/${id}/pdf`;
+    }
+
+    async function deleteInvoice(id) {
+      if (!confirm('Delete this invoice and its payments?')) return;
+      await api(`/api/invoices/${id}`, { method: 'DELETE' });
+      await refreshAll();
+    }
+
+    function openPaymentForm(id = null, invoiceId = null) {
+      const dialog = document.getElementById('payment-dialog');
+      document.getElementById('payment-dialog-title').textContent = id ? 'Edit payment' : 'Record payment';
+      document.getElementById('payment-id').value = id || '';
+      document.getElementById('payment-invoice-id').innerHTML = invoiceOptions();
+      const payment = id ? state.payments.find(p => p.id === id) : null;
+      document.getElementById('payment-invoice-id').value = payment?.invoice_id || invoiceId || state.invoices[0]?.id || '';
+      document.getElementById('payment-amount').value = payment?.amount_paid ?? '';
+      document.getElementById('payment-date').value = payment?.date_paid || '';
+      document.getElementById('payment-method').value = payment?.payment_method || '';
+      document.getElementById('payment-notes').value = payment?.notes || '';
+      dialog.showModal();
+    }
+
+    async function submitPayment(event) {
+      event.preventDefault();
+      const id = document.getElementById('payment-id').value;
+      const payload = {
+        invoice_id: Number(document.getElementById('payment-invoice-id').value),
+        amount_paid: document.getElementById('payment-amount').value ? Number(document.getElementById('payment-amount').value) : null,
+        date_paid: document.getElementById('payment-date').value || null,
+        payment_method: document.getElementById('payment-method').value || null,
+        notes: document.getElementById('payment-notes').value || null,
+      };
+      try {
+        if (id) await api(`/api/payments/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        else await api('/api/payments', { method: 'POST', body: JSON.stringify(payload) });
+        closeDialog('payment-dialog');
+        await refreshAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deletePayment(id) {
+      if (!confirm('Delete this payment?')) return;
+      await api(`/api/payments/${id}`, { method: 'DELETE' });
+      await refreshAll();
+    }
+
+    function openGameForm(id = null) {
+      const dialog = document.getElementById('game-dialog');
+      document.getElementById('game-dialog-title').textContent = id ? 'Edit game' : 'Add game';
+      document.getElementById('game-id').value = id || '';
+      document.getElementById('game-home-school-id').innerHTML = '<option value="">—</option>' + schoolOptions();
+      document.getElementById('game-away-school-id').innerHTML = '<option value="">—</option>' + schoolOptions();
+      const game = id ? state.games.find(g => g.id === id) : null;
+      document.getElementById('game-date').value = game?.game_date || '';
+      document.getElementById('game-time').value = game?.game_time || '';
+      document.getElementById('game-level').value = game?.level || '';
+      document.getElementById('game-sport').value = game?.sport || 'Lacrosse';
+      document.getElementById('game-season-year').value = game?.season_year ?? '';
+      document.getElementById('game-home-school-id').value = game?.home_school_id ?? '';
+      document.getElementById('game-away-school-id').value = game?.away_school_id ?? '';
+      document.getElementById('game-field-location').value = game?.field_location || '';
+      dialog.showModal();
+    }
+
+    async function submitGame(event) {
+      event.preventDefault();
+      const id = document.getElementById('game-id').value;
+      const payload = {
+        game_date: document.getElementById('game-date').value,
+        game_time: document.getElementById('game-time').value || null,
+        level: document.getElementById('game-level').value || null,
+        home_school_id: document.getElementById('game-home-school-id').value ? Number(document.getElementById('game-home-school-id').value) : null,
+        away_school_id: document.getElementById('game-away-school-id').value ? Number(document.getElementById('game-away-school-id').value) : null,
+        field_location: document.getElementById('game-field-location').value || null,
+        season_year: document.getElementById('game-season-year').value ? Number(document.getElementById('game-season-year').value) : null,
+        sport: document.getElementById('game-sport').value,
+      };
+      try {
+        if (id) await api(`/api/games/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        else await api('/api/games', { method: 'POST', body: JSON.stringify(payload) });
+        closeDialog('game-dialog');
+        await refreshAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteGame(id) {
+      if (!confirm('Delete this game?')) return;
+      await api(`/api/games/${id}`, { method: 'DELETE' });
+      await refreshAll();
+    }
+
+    function downloadBackup(kind) {
+      window.location.href = kind === 'excel' ? '/api/backup/excel' : '/api/backup/json';
+    }
+
+    async function saveLocalBackup() {
+      const resultEl = document.getElementById('backup-result');
+      resultEl.textContent = 'Saving...';
+      try {
+        const data = await api('/api/backup/save', { method: 'POST' });
+        resultEl.innerHTML = `<span class="ok">Saved backup files:</span><br><code>${escapeHtml(data.json_path)}</code><br><code>${escapeHtml(data.excel_path)}</code>`;
+      } catch (err) {
+        resultEl.innerHTML = `<span class="error">${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    async function reimportAccess() {
+      const resultEl = document.getElementById('access-import-result');
+      if (!confirm('Replace all current data with a fresh import from Invoice Database.accdb?')) return;
+      resultEl.textContent = 'Importing from Access...';
+      try {
+        const data = await api('/api/import/access', { method: 'POST' });
+        const c = data.counts;
+        resultEl.innerHTML = `<span class="ok">Imported ${c.schools} schools, ${c.invoices} invoices, ${c.payments} payments, ${c.games} games.</span>`;
+        await refreshAll();
+      } catch (err) {
+        resultEl.innerHTML = `<span class="error">${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    async function importBackup() {
+      const fileInput = document.getElementById('import-file');
+      const resultEl = document.getElementById('import-result');
+      if (!fileInput.files.length) {
+        alert('Choose a JSON backup file first.');
+        return;
+      }
+      const replace = document.getElementById('import-replace').checked;
+      if (replace && !confirm('This will replace all current data. Continue?')) return;
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      resultEl.textContent = 'Importing...';
+      try {
+        const res = await fetch(`/api/backup/import?replace=${replace}`, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || res.statusText);
+        resultEl.innerHTML = `<span class="ok">Imported ${data.counts.schools} schools, ${data.counts.invoices} invoices, ${data.counts.payments} payments, ${data.counts.games} games.</span>`;
+        fileInput.value = '';
+        await refreshAll();
+      } catch (err) {
+        resultEl.innerHTML = `<span class="error">${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    refreshAll().catch(err => {
+      document.getElementById('status-meta').innerHTML = `<span class="error">${escapeHtml(err.message)}</span>`;
+    });
+  </script>
+</body>
+</html>

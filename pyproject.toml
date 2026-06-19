@@ -1,7 +1,7 @@
 [project]
 name = "neon-dump-2-xls"
 version = "0.1.0"
-description = "Export a Neon PostgreSQL database to a multi-sheet Excel workbook"
+description = "Local invoice database for schools, billing, payments, and schedules"
 readme = "idea.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -9,12 +9,17 @@ dependencies = [
     "openpyxl>=3.1.5",
     "psycopg2-binary>=2.9.10",
     "pydantic>=2.10.0",
+    "pdfplumber>=0.11.0",
+    "reportlab>=4.2.0",
     "python-dotenv>=1.0.1",
+    "python-multipart>=0.0.20",
     "uvicorn>=0.34.0",
 ]
 
 [project.scripts]
 neon-dump = "app.main:main"
+invoice-app = "app.invoice_main:main"
+import-invoice-sources = "scripts.import_invoice_sources:main"
 provision-readonly = "scripts.provision_readonly_user:main"
 
 [build-system]

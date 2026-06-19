@@ -4,6 +4,8 @@ __pycache__/
 .env
 config.json
 exports/
+data/
+*.db
 *.xlsx
 .DS_Store
 dist/
