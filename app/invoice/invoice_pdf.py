@@ -132,11 +132,84 @@ def _logo_flowable() -> Image | None:
     path = invoice_logo_path()
     if path is None:
         return None
-    width = 5.0 * inch
+    width = 2.5 * inch
     height = width * (512 / 722)
     logo = Image(str(path), width=width, height=height)
     logo.hAlign = "CENTER"
     return logo
+
+
+def _build_header_table(
+    payee: InvoicePayee,
+    *,
+    normal: ParagraphStyle,
+    bold: ParagraphStyle,
+    header_title: ParagraphStyle,
+    content_width: float,
+) -> Table:
+    side_width = 2.35 * inch
+    center_width = content_width - (2 * side_width)
+    logo = _logo_flowable()
+
+    payee_block = Table(
+        [
+            [Paragraph(payee.name, bold)],
+            [Paragraph(payee.address_line1, normal)],
+            [Paragraph(payee.city_state_zip, normal)],
+        ],
+        colWidths=[side_width],
+    )
+    payee_block.setStyle(
+        TableStyle(
+            [
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+
+    contact_block = Table(
+        [
+            [Paragraph("Contact:", normal)],
+            [Paragraph(payee.email, normal)],
+        ],
+        colWidths=[side_width],
+    )
+    contact_block.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+
+    center_cell: Image | Paragraph
+    if logo is not None:
+        center_cell = logo
+    else:
+        center_cell = Paragraph(payee.title, header_title)
+
+    header_table = Table(
+        [[payee_block, center_cell, contact_block]],
+        colWidths=[side_width, center_width, side_width],
+    )
+    header_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    return header_table
 
 
 def render_invoice_pdf(
@@ -204,32 +277,13 @@ def render_invoice_pdf(
     if school.zip:
         city_line = f"{city_line} {school.zip}".strip()
 
-    header_left = [
-        [Paragraph(payee.name, bold)],
-        [Paragraph(payee.address_line1, normal)],
-        [Paragraph(payee.city_state_zip, normal)],
-    ]
-    header_right = [
-        [Paragraph("Contact:", normal)],
-        [Paragraph(payee.email, normal)],
-    ]
-    header_table = Table(
-        [
-            [
-                Table(header_left, colWidths=[3.5 * inch]),
-                Table(header_right, colWidths=[2.5 * inch]),
-            ]
-        ],
-        colWidths=[4.0 * inch, 3.5 * inch],
-    )
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ]
-        )
+    content_width = letter[0] - doc.leftMargin - doc.rightMargin
+    header_table = _build_header_table(
+        payee,
+        normal=normal,
+        bold=bold,
+        header_title=header_title,
+        content_width=content_width,
     )
 
     bill_to = Table(
@@ -298,22 +352,14 @@ def render_invoice_pdf(
         )
     )
 
-    story = [header_table]
-
-    logo = _logo_flowable()
-    if logo is not None:
-        story.extend([Spacer(1, 0.1 * inch), logo, Spacer(1, 0.05 * inch)])
-    else:
-        story.append(Paragraph(payee.title, header_title))
-
-    story.extend(
-        [
-            bill_to,
-            Spacer(1, 0.15 * inch),
-            Paragraph(_invoice_title(invoice.sport), title),
-            items_table,
-        ]
-    )
+    story = [
+        header_table,
+        Spacer(1, 0.2 * inch),
+        bill_to,
+        Spacer(1, 0.15 * inch),
+        Paragraph(_invoice_title(invoice.sport), title),
+        items_table,
+    ]
 
     if invoice.collection_status:
         story.append(Paragraph(f"NOTE: {invoice.collection_status}", note_style))
